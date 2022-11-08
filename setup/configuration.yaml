@@ -1,0 +1,9 @@
+apiVersion: akri.sh/v0
+kind: Configuration
+metadata:
+  name: onvifjs
+spec:
+  discoveryHandler:
+    name: onvifjs
+    discoveryDetails: |+
+      prop1: 'foo'
