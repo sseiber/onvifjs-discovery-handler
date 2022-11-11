@@ -10,8 +10,22 @@ export const DISCOVERY_HANDLER_SOCKET_NAME = `${DISCOVERY_HANDLER_NAME}.sock`;
 
 export interface IDiscoveryDetails {
     timeoutSeconds?: number;
-    ipFilter?: 'Include' | 'include' | 'Exclude' | 'exclude';
-    ipAddresses?: string[];
-    macFilter?: 'Include' | 'include' | 'Exclude' | 'exclude';
-    macAddresses?: string[];
+    ipFilter?: {
+        include: string[];
+        exclude: string[];
+    };
+    scopeFilter?: {
+        include: string[];
+        exclude: string[];
+    };
+    macFilter?: {
+        include: string[];
+        exclude: string[];
+    };
+}
+
+export interface ICameraResult {
+    uid: string;
+    ipAddress: string;
+    scopes: string[];
 }

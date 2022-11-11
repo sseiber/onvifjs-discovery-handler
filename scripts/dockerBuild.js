@@ -11,6 +11,7 @@ const programArgs = new Command()
     .option('-p, --docker-push', 'Docker push the image')
     .option('-r, --workspace-root <workspaceRoot>', 'Workspace root folder path')
     .option('-v, --image-version <version>', 'Docker image version override')
+    .option('-t, --build-tag <buildTag>', 'Image build tag')
     .parse(process.argv);
 const programOptions = programArgs.opts();
 
@@ -50,9 +51,10 @@ async function start() {
         const configFile = programOptions.configFile || `imageConfig.json`;
         const imageConfigFilePath = path.resolve(workspaceRootFolder, `configs`, configFile);
         const imageConfig = fse.readJSONSync(imageConfigFilePath);
-        const dockerVersion = imageConfig.versionTag || process.env.npm_package_version || programOptions.imageVersion || 'latest';
+        const dockerBuildTag = imageConfig.versionTag || process.env.npm_package_version || programOptions.imageVersion || 'latest';
         const dockerArch = `${imageConfig.arch}${programOptions.debug ? '-debug' : ''}` || '';
-        const dockerImage = `${imageConfig.imageName}:${dockerVersion}-${dockerArch}`;
+        const dockerImageTag = programOptions.buildTag ? `${programOptions.buildTag}` : `${dockerBuildTag}-${dockerArch}`
+        const dockerImage = `${imageConfig.imageName}:${dockerImageTag}`;
 
         log(`Docker image: ${dockerImage}`);
         log(`Platform: ${os.type()}`);

@@ -10,8 +10,9 @@ import {
     DISCOVERY_HANDLER_NAME,
     DEFAULT_DISCOVERY_HANDLER_SOCKET,
     DISCOVERY_HANDLER_SOCKET_NAME,
+    AGENT_REGISTRATION_SOCKET_NAME,
     IDiscoveryDetails,
-    AGENT_REGISTRATION_SOCKET_NAME
+    ICameraResult
 } from './consts';
 import { ProtoGrpcType } from '../proto/discovery';
 import { RegisterDiscoveryHandlerRequest } from '../proto/v0/RegisterDiscoveryHandlerRequest';
@@ -21,6 +22,27 @@ import { DiscoverResponse } from '../proto/v0/DiscoverResponse';
 import { DiscoveryHandlerHandlers } from '../proto/v0/DiscoveryHandler';
 import { Device } from '../proto/v0/Device';
 import { IAppConfig } from 'src';
+
+interface IOnvifProbeResult {
+    probeMatches: {
+        probeMatch: {
+            endpointReference: {
+                address: string;
+            };
+            metadataVersion: number;
+            scopes: string;
+            types: string;
+            XAddrs: string;
+        };
+    };
+}
+
+interface IOnvifRInfo {
+    address: string;
+    family: string;
+    port: number;
+    size: number;
+}
 
 export class OnvifJsDiscoveryHandler {
     private appConfig: IAppConfig;
@@ -186,8 +208,18 @@ export class OnvifJsDiscoveryHandler {
     private parseDiscoveryDetails(requestDetails: string): IDiscoveryDetails {
         this.appConfig.logger(['discoveryHandler', 'info'], `parseDiscoveryDetails`);
 
+        let discoveryDetails = {};
+
+        try {
+            discoveryDetails = JSON.parse(requestDetails);
+        }
+        catch (ex) {
+            this.appConfig.logger(['discoveryHandler', 'error'], `error parsing requested discovery details: ${ex.message}`);
+        }
+
         return {
-            timeoutSeconds: 5
+            timeoutSeconds: 5,
+            ...discoveryDetails
         };
     }
 
@@ -222,12 +254,18 @@ export class OnvifJsDiscoveryHandler {
         this.appConfig.logger(['Discover stream', 'error'], error.message);
     }
 
-    private async discoverOnvifCameras(discoveryDetails: IDiscoveryDetails): Promise<Device[]> {
-        let devices: Device[] = [];
+    private async discoverOnvifCameras(discoveryDetails: IDiscoveryDetails): Promise<ICameraResult[]> {
+        this.appConfig.logger(['discoveryHandler', 'info'], `discoverOnvifCameras`);
+
+        let cameraResults: ICameraResult[] = [];
+        const mapCameraRinfo: Map<string, IOnvifProbeResult> = new Map<string, IOnvifProbeResult>();
 
         try {
-            onvif.Discovery.on('device', (_cam, rinfo, _xml) => {
-                this.appConfig.logger(['discoveryHandler', 'info'], '\n\ncam info...');
+            onvif.Discovery.on('device', async (cam: IOnvifProbeResult, rinfo: IOnvifRInfo, _xml) => {
+                mapCameraRinfo.set(rinfo.address, cam);
+
+                this.appConfig.logger(['discoveryHandler', 'info'], '\ncam info...');
+                this.appConfig.logger(['discoveryHandler', 'info'], JSON.stringify(cam, null, 4));
 
                 this.appConfig.logger(['discoveryHandler', 'info'], 'rinfo...');
                 this.appConfig.logger(['discoveryHandler', 'info'], JSON.stringify(rinfo, null, 4));
@@ -238,16 +276,23 @@ export class OnvifJsDiscoveryHandler {
             });
 
             this.appConfig.logger(['discoveryHandler', 'info'], 'Starting camera discover...');
-            devices = await new Promise((resolve, reject) => {
+            cameraResults = await new Promise((resolve, reject) => {
                 onvif.Discovery.probe({
                     timeout: discoveryDetails.timeoutSeconds * 1000,
                     resolve: false
-                }, (discoveryError, discoveryCameras) => {
+                }, (discoveryError: Error, _discoveryCameras: any) => {
                     if (discoveryError) {
                         return reject(discoveryError);
                     }
 
-                    return resolve(discoveryCameras);
+                    try {
+                        const results = this.parseCameraResults(mapCameraRinfo);
+
+                        return resolve(results);
+                    }
+                    catch (ex) {
+                        return reject(new Error(`error while parsing discovered camera results: ${ex.message}`));
+                    }
                 });
             });
         }
@@ -255,10 +300,26 @@ export class OnvifJsDiscoveryHandler {
             this.appConfig.logger(['discoveryHandler', 'error'], `error during onvif network discovery: ${ex.message}`);
         }
 
-        return devices;
+        return cameraResults;
     }
 
-    private async writeStreamData(stream: grpc.ServerWritableStream<DiscoverRequest, DiscoverResponse>, data: any): Promise<void> {
+    private parseCameraResults(mapCameraRinfo: Map<string, IOnvifProbeResult>): ICameraResult[] {
+        const cameraResults: ICameraResult[] = [];
+
+        for (const cameraResult of mapCameraRinfo) {
+            const probeMatch = cameraResult[1]?.probeMatches?.probeMatch;
+
+            cameraResults.push({
+                uid: probeMatch?.endpointReference?.address || '',
+                ipAddress: cameraResult[0],
+                scopes: (probeMatch?.scopes || '').split(' ')
+            });
+        }
+
+        return cameraResults;
+    }
+
+    private async writeStreamData(stream: grpc.ServerWritableStream<DiscoverRequest, DiscoverResponse>, data: DiscoverResponse): Promise<void> {
         return new Promise((resolve, reject) => {
             const cb = (err, res) => {
                 if (err) {
