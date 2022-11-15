@@ -298,6 +298,7 @@ export class OnvifJsDiscoveryHandler {
         return devices;
     }
 
+    // test comment
     private parseCameraResults(mapCameraRinfo: Map<string, IOnvifProbeResult>): Device[] {
         this.appConfig.logger(['discoveryHandler', 'info'], `parseCameraResults`);
 
