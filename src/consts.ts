@@ -23,9 +23,3 @@ export interface IDiscoveryDetails {
         exclude: string[];
     };
 }
-
-export interface ICameraResult {
-    uid: string;
-    ipAddress: string;
-    scopes: string[];
-}
