@@ -11,8 +11,7 @@ import {
     DEFAULT_DISCOVERY_HANDLER_SOCKET,
     DISCOVERY_HANDLER_SOCKET_NAME,
     AGENT_REGISTRATION_SOCKET_NAME,
-    IDiscoveryDetails,
-    ICameraResult
+    IDiscoveryDetails
 } from './consts';
 import { ProtoGrpcType } from '../proto/discovery';
 import { RegisterDiscoveryHandlerRequest } from '../proto/v0/RegisterDiscoveryHandlerRequest';
@@ -298,7 +297,6 @@ export class OnvifJsDiscoveryHandler {
         return devices;
     }
 
-    // test comment
     private parseCameraResults(mapCameraRinfo: Map<string, IOnvifProbeResult>): Device[] {
         this.appConfig.logger(['discoveryHandler', 'info'], `parseCameraResults`);
 
@@ -319,6 +317,8 @@ export class OnvifJsDiscoveryHandler {
         }
         catch (ex) {
             this.appConfig.logger(['discoveryHandler', 'error'], `error while parsing discovered camera results: ${ex.message}`);
+
+            // REVIEW: return partial set of devices on error?
         }
 
         return devices;
@@ -327,18 +327,26 @@ export class OnvifJsDiscoveryHandler {
     private parseOnvifScopes(scopes: string[]): any {
         this.appConfig.logger(['discoveryHandler', 'info'], `parseOnvifScopes`);
 
-        let scopeProperties = {};
+        const scopeProperties = {};
 
         try {
             for (const scope of scopes) {
-                const trimmedScope = scope.replace('onvif://www.onvif.org/', '');
-                const trimmedScopeKeyValue = trimmedScope.split('/');
+                const scopeElements = scope.replace('onvif://www.onvif.org/', '').split('/');
+                const scopeKey = scopeElements.shift();
+                const scopeValue = scopeElements.map((element) => decodeURIComponent(element)).join(', ');
 
-                if (trimmedScopeKeyValue.length === 2) {
-                    Object.assign(scopeProperties, { [trimmedScopeKeyValue[0]]: trimmedScopeKeyValue[1] });
+                if (!Object.prototype.hasOwnProperty.call(scopeProperties, scopeKey)) {
+                    Object.assign(scopeProperties, { [scopeKey]: scopeValue });
                 }
                 else {
-                    this.appConfig.logger(['discoveryHandler', 'error'], `error: the scope value is not a leaf: ${trimmedScope}`);
+                    const scopeValues = scopeProperties[scopeKey];
+
+                    if (!Array.isArray(scopeValues)) {
+                        scopeProperties[scopeKey] = [scopeValues, scopeValue];
+                    }
+                    else {
+                        scopeValues.push(scopeValue);
+                    }
                 }
             }
         }
