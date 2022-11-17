@@ -10,8 +10,16 @@ export const DISCOVERY_HANDLER_SOCKET_NAME = `${DISCOVERY_HANDLER_NAME}.sock`;
 
 export interface IDiscoveryDetails {
     timeoutSeconds?: number;
-    ipFilter?: 'Include' | 'include' | 'Exclude' | 'exclude';
-    ipAddresses?: string[];
-    macFilter?: 'Include' | 'include' | 'Exclude' | 'exclude';
-    macAddresses?: string[];
+    ipAddresses?: {
+        action: 'include' | 'exclude';
+        items: string[];
+    };
+    macAddresses?: {
+        action: 'include' | 'exclude';
+        items: string[];
+    };
+    scopes?: {
+        action: 'include' | 'exclude';
+        items: string[];
+    };
 }

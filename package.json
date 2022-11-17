@@ -1,6 +1,6 @@
 {
     "name": "akri-onvifjs-discovery",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "description": "akri-onvifjs-discovery",
     "main": "index.js",
     "scripts": {
@@ -10,6 +10,7 @@
         "build:proto": "proto-loader-gen-types --longs=String --enums=String --defaults --oneofs --grpcLib=@grpc/grpc-js --outDir=proto/ proto/*.proto",
         "dockerbuild": "npm run build && node ./scripts/dockerBuild.js --docker-build",
         "dockerpush": "node ./scripts/dockerBuild.js --docker-push",
+        "dockertag": "node ./storage/dockerTag.js",
         "preversion": "npm test",
         "version": "node ./scripts/dockerBuild.js --docker-build",
         "postversion": "node ./scripts/dockerBuild.js --docker-push",
